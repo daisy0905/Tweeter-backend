@@ -468,6 +468,21 @@ def comments():
                 for comment in comments:
                     comment["username"] = username
                 print(comments)
+            else:
+                cursor.execute("SELECT * FROM comment INNER JOIN users ON comment.user_id = users.id")
+                rows = cursor.fetchall()
+                comments = []
+                for i in range(len(rows)):
+                    comment={
+                        "id": rows[i][0],
+                        "content": rows[i][1],
+                        "created_at": rows[i][2],
+                        "user_id": rows[i][3],
+                        "tweet_id": rows[i][4],
+                        "username": rows[i][6]
+                    }
+                    print(comment)
+                    comments.append(comment)
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -632,6 +647,7 @@ def tweet_likes():
     if request.method == 'GET':
         conn = None
         cursor = None
+        tweet_likes = None
         tweet_id = request.args.get("tweet_id")
         print(tweet_id)
         try:
@@ -651,6 +667,18 @@ def tweet_likes():
                         "tweet_id": tweet_id,
                         "user_id": user_id,
                         "username": username
+                    }
+                    print(tweet_like)
+                    tweet_likes.append(tweet_like)
+            else:
+                cursor.execute("SELECT * FROM tweet_like INNER JOIN users ON tweet_like.user_id = users.id")
+                rows = cursor.fetchall()
+                tweet_likes = []
+                for i in range(len(rows)):
+                    tweet_like={
+                        "tweet_id": rows[i][1],
+                        "user_id": rows[i][2],
+                        "username": rows[i][4]
                     }
                     print(tweet_like)
                     tweet_likes.append(tweet_like)
@@ -748,6 +776,141 @@ def tweet_likes():
                 return Response("Deleted success!", mimetype="text/html", status=201)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
+
+@app.route('/comment_likes', methods=['GET', 'POST', 'DELETE'])
+def comment_likes():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        comment_likes = None
+        comment_id = request.args.get("comment_id")
+        print(comment_id)
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            if comment_id != None and comment_id != "":
+                cursor.execute("SELECT * FROM comment_like WHERE comment_id=?", [comment_id])
+                rows = cursor.fetchall()
+                comment_likes = []
+                for row in rows:
+                    user_id = row[2]
+                    print(user_id)
+                    cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
+                    user_row = cursor.fetchone()
+                    username = user_row[1]
+                    comment_like = {
+                        "comment_id": comment_id,
+                        "user_id": user_id,
+                        "username": username
+                    }
+                    print(comment_like)
+                    comment_likes.append(comment_like)
+            else:
+                cursor.execute("SELECT * FROM comment_like INNER JOIN users ON comment_like.user_id = users.id")
+                rows = cursor.fetchall()
+                comment_likes = []
+                for i in range(len(rows)):
+                    comment_like={
+                        "comment_id": rows[i][1],
+                        "user_id": rows[i][2],
+                        "username": rows[i][4]
+                    }
+                    print(comment_like)
+                    comment_likes.append(comment_like)
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(comment_likes != None):
+                return Response(json.dumps(comment_likes, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+    
+    elif request.method == 'POST':
+        conn = None
+        cursor = None
+        token = request.json.get("token")
+        comment_id = request.json.get("comment_id")
+        user = None
+        rows = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+            user = cursor.fetchone()
+            print(user)
+            if user != None and user != []:
+                user_id = user[2]
+                print(user_id)
+                cursor.execute("INSERT INTO comment_like(comment_id, user_id) VALUES(?, ?)", [comment_id, user_id])
+                conn.commit()
+                rows = cursor.rowcount
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response("like success!", mimetype="text/html", status=201)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+
+    # elif request.method == 'DELETE':
+    #     conn = None
+    #     cursor = None
+    #     token = request.json.get("token")
+    #     tweet_id = request.json.get("tweet_id")
+    #     user = None
+    #     rows = None
+    #     try:
+    #         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+    #         cursor = conn.cursor()
+    #         cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+    #         user = cursor.fetchone()
+    #         print(user)
+    #         if user != None and user != []:
+    #             user_id = user[2]
+    #             print(user_id)
+    #             cursor.execute("DELETE FROM tweet_like WHERE tweet_id=? AND user_id=?", [tweet_id, user_id])
+    #             conn.commit()
+    #             rows = cursor.rowcount
+    #     except mariadb.dataError:
+    #         print("There seems to be something wrong with your data.")
+    #     except mariadb.databaseError:
+    #         print("There seems to be something wrong with your database.")
+    #     except mariadb.ProgrammingError:
+    #         print("There seems to be something wrong with SQL written.")
+    #     except mariadb.OperationalError:
+    #         print("There seems to be something wrong with the connection.")
+    #     finally:
+    #         if(cursor != None):
+    #             cursor.close()
+    #         if(conn != None):
+    #             conn.rollback()
+    #             conn.close()
+    #         if(rows == 1):
+    #             return Response("Deleted success!", mimetype="text/html", status=201)
+    #         else:
+    #             return Response("Something went wrong!", mimetype="text/html", status=500)
     
 
     
