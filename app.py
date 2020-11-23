@@ -627,8 +627,51 @@ def comments():
             else:
                 return Response("Delete failed", mimetype="text/html", status=500)
 
-
-    
+@app.route('/tweet_likes', methods=['GET', 'POST', 'PATCH', 'DELETE'])
+def tweet_likes():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        tweet_id = request.args.get("tweet_id")
+        print(tweet_id)
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            if tweet_id != None and tweet_id != "":
+                cursor.execute("SELECT * FROM tweet_like WHERE tweet_id=?", [tweet_id])
+                rows = cursor.fetchall()
+                tweet_likes = []
+                for row in rows:
+                    user_id = row[2]
+                    print(user_id)
+                    cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
+                    user_row = cursor.fetchone()
+                    username = user_row[1]
+                    tweet_like = {
+                        "tweet_id": tweet_id,
+                        "user_id": user_id,
+                        "username": username
+                    }
+                    print(tweet_like)
+                    tweet_likes.append(tweet_like)
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(tweet_likes != None):
+                return Response(json.dumps(tweet_likes, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
     
 
         
