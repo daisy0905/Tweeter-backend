@@ -25,6 +25,8 @@ def users():
                 users = {}
                 headers = [i[0] for i in cursor.description]
                 users = dict(zip(headers, row))
+                users.pop("password")
+                print(users)
             else:
                 cursor.execute("SELECT * FROM users")
                 rows = cursor.fetchall()
@@ -32,6 +34,9 @@ def users():
                 headers = [i[0] for i in cursor.description]
                 for row in rows:
                     users.append(dict(zip(headers, row)))
+                for user in users:
+                    user.pop("password")
+                    print(user)
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -47,7 +52,7 @@ def users():
                 conn.rollback()
                 conn.close()
             if(users != None):
-                return Response(json.dumps(users, default=str), mimetype="application/json", status=201)
+                return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
@@ -158,7 +163,7 @@ def users():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
-                return Response(json.dumps(users, default=str), mimetype="application/json", status=201)
+                return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
@@ -238,7 +243,7 @@ def login():
                 conn.rollback()
                 conn.close()
             if rows == 1:
-                return Response("logout success!", mimetype="text/html", status=201)
+                return Response("logout success!", mimetype="text/html", status=204)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
@@ -254,7 +259,7 @@ def tweets():
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if user_id != None and user_id != "":
-                cursor.execute("SELECT * FROM tweet WHERE user_id=?", [user_id])
+                cursor.execute("SELECT * FROM tweet WHERE user_id=? ORDER BY created_at DESC", [user_id])
                 rows = cursor.fetchall()
                 tweets = []
                 headers = [i[0] for i in cursor.description]
@@ -268,7 +273,7 @@ def tweets():
                     tweet["username"] = username
                 print(tweets)
             else:
-                cursor.execute("SELECT * FROM tweet INNER JOIN users ON tweet.user_id = users.id")
+                cursor.execute("SELECT * FROM tweet INNER JOIN users ON tweet.user_id = users.id ORDER BY tweet.created_at DESC")
                 rows = cursor.fetchall()
                 tweets = []
                 for i in range(len(rows)):
@@ -396,7 +401,7 @@ def tweets():
                 conn.rollback()
                 conn.close()
             if rows == 1:
-                return Response(json.dumps(tweet, default=str), mimetype="application/json", status=201)
+                return Response(json.dumps(tweet, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Updated failed", mimetype="text/html", status=500)
     
@@ -454,7 +459,7 @@ def comments():
                 row = cursor.fetchone()
                 user_id = row[3]
                 print(user_id)
-                cursor.execute("SELECT * FROM comment WHERE user_id=? AND tweet_id=?", [user_id, tweet_id])
+                cursor.execute("SELECT * FROM comment WHERE user_id=? AND tweet_id=? ORDER BY created_at DESC", [user_id, tweet_id])
                 rows = cursor.fetchall()
                 print(rows)
                 comments = []
@@ -773,7 +778,7 @@ def tweet_likes():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
-                return Response("Deleted success!", mimetype="text/html", status=201)
+                return Response("Deleted success!", mimetype="text/html", status=204)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
@@ -874,44 +879,168 @@ def comment_likes():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
-    # elif request.method == 'DELETE':
-    #     conn = None
-    #     cursor = None
-    #     token = request.json.get("token")
-    #     tweet_id = request.json.get("tweet_id")
-    #     user = None
-    #     rows = None
-    #     try:
-    #         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
-    #         cursor = conn.cursor()
-    #         cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
-    #         user = cursor.fetchone()
-    #         print(user)
-    #         if user != None and user != []:
-    #             user_id = user[2]
-    #             print(user_id)
-    #             cursor.execute("DELETE FROM tweet_like WHERE tweet_id=? AND user_id=?", [tweet_id, user_id])
-    #             conn.commit()
-    #             rows = cursor.rowcount
-    #     except mariadb.dataError:
-    #         print("There seems to be something wrong with your data.")
-    #     except mariadb.databaseError:
-    #         print("There seems to be something wrong with your database.")
-    #     except mariadb.ProgrammingError:
-    #         print("There seems to be something wrong with SQL written.")
-    #     except mariadb.OperationalError:
-    #         print("There seems to be something wrong with the connection.")
-    #     finally:
-    #         if(cursor != None):
-    #             cursor.close()
-    #         if(conn != None):
-    #             conn.rollback()
-    #             conn.close()
-    #         if(rows == 1):
-    #             return Response("Deleted success!", mimetype="text/html", status=201)
-    #         else:
-    #             return Response("Something went wrong!", mimetype="text/html", status=500)
-    
+    elif request.method == 'DELETE':
+        conn = None
+        cursor = None
+        token = request.json.get("token")
+        comment_id = request.json.get("comment_id")
+        user = None
+        rows = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+            user = cursor.fetchone()
+            print(user)
+            if user != None and user != []:
+                user_id = user[2]
+                print(user_id)
+                cursor.execute("DELETE FROM comment_like WHERE comment_id=? AND user_id=?", [comment_id, user_id])
+                conn.commit()
+                rows = cursor.rowcount
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response("Deleted success!", mimetype="text/html", status=204)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+
+@app.route('/follows', methods=['GET', 'POST', 'DELETE'])
+def follows():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        user_id = request.args.get("user_id")
+        print(user_id)
+        follows = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            if user_id != None and user_id != "":
+                cursor.execute("SELECT * FROM follow INNER JOIN users ON follow.follow_id = users.id WHERE user_id=?", [user_id])
+                rows = cursor.fetchall()
+                print(rows)
+                follows = []
+                for i in range(len(rows)):
+                    follow={
+                        "follow_id": rows[i][2],
+                        "username": rows[i][4],
+                        "birthdate": rows[i][6],
+                        "bio": rows[i][7],
+                        "email": rows[i][8],
+                        "image": rows[i][9],
+                        "created_at": rows[i][10]
+                    }
+                    print(follow)
+                    follows.append(follow)
+                    
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(users != None):
+                return Response(json.dumps(follows, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+
+    elif request.method == 'POST':
+        conn = None
+        cursor = None
+        follow_id = request.json.get("follow_id")
+        token = request.json.get("token")
+        user = None
+        rows = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+            user = cursor.fetchone()
+            print(user)
+            if user != None and user != []:
+                user_id = user[2]
+                print(user_id)
+                cursor.execute("INSERT INTO follow(user_id, follow_id) VALUES(?, ?)", [user_id, follow_id])
+                conn.commit()
+                rows = cursor.rowcount
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response("Follow success!", mimetype="text/html", status=201)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+
+    elif request.method == 'DELETE':
+        conn = None
+        cursor = None
+        token = request.json.get("token")
+        follow_id = request.json.get("follow_id")
+        user = None
+        rows = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+            user = cursor.fetchone()
+            print(user)
+            if user != None and user != []:
+                user_id = user[2]
+                print(user_id)
+                cursor.execute("DELETE FROM follow WHERE user_id=? AND follow_id=?", [user_id, follow_id])
+                conn.commit()
+                rows = cursor.rowcount
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response("Deleted success!", mimetype="text/html", status=204)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+            
 
     
 
