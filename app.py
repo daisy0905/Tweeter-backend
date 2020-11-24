@@ -944,8 +944,7 @@ def follows():
                         "created_at": rows[i][10]
                     }
                     print(follow)
-                    follows.append(follow)
-                    
+                    follows.append(follow)          
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -1038,6 +1037,54 @@ def follows():
                 conn.close()
             if(rows == 1):
                 return Response("Deleted success!", mimetype="text/html", status=204)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+
+@app.route('/followers', methods=['GET'])
+def followers():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        follow_id = request.args.get("follow_id")
+        print(follow_id)
+        followers = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            if follow_id != None and follow_id != "":
+                cursor.execute("SELECT * FROM follow INNER JOIN users ON follow.user_id = users.id WHERE follow_id=?", [follow_id])
+                rows = cursor.fetchall()
+                print(rows)
+                followers = []
+                for i in range(len(rows)):
+                    follower={
+                        "user_id": rows[i][1],
+                        "username": rows[i][4],
+                        "birthdate": rows[i][6],
+                        "bio": rows[i][7],
+                        "email": rows[i][8],
+                        "image": rows[i][9],
+                        "created_at": rows[i][10]
+                    }
+                    print(follower)
+                    followers.append(follower)
+                    
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(users != None):
+                return Response(json.dumps(followers, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
             
