@@ -4,9 +4,14 @@ import json
 import dbcreds
 from flask_cors import CORS
 import random
+import string
 
 app = Flask(__name__)
 CORS(app)
+def create_token():
+    letters = string.ascii_letters
+    loginToken = ''.join(random.choice(letters) for i in range(30))
+    return loginToken
 
 @app.route('/users', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def users():
@@ -21,11 +26,13 @@ def users():
             cursor = conn.cursor()
             if user_id != None and user_id != "":
                 cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
-                row = cursor.fetchone()
-                users = {}
+                rows = cursor.fetchall()
+                users = []
                 headers = [i[0] for i in cursor.description]
-                users = dict(zip(headers, row))
-                users.pop("password")
+                for row in rows:
+                    users.append(dict(zip(headers, row)))
+                for user in users:
+                    user.pop("password")
                 print(users)
             else:
                 cursor.execute("SELECT * FROM users")
@@ -74,21 +81,22 @@ def users():
             conn.commit()
             rows = cursor.rowcount
             print(rows)
-            cursor.execute("SELECT * FROM users WHERE username=?", [user_username])
-            user_row = cursor.fetchone()
-            user_id = user_row[0]
-            print(user_id)
-            user = {}
-            headers = [i[0] for i in cursor.description]
-            user = dict(zip(headers, user_row))
-            token = random.randint(0, 10000000)
-            cursor.execute("INSERT INTO user_session(loginToken, user_id) VALUES(?, ?)", [token, user_id])
-            conn.commit()
-            rows = cursor.rowcount
             if rows == 1:
-                user["loginToken"] = token
-                print(token)
-                print(user)
+                user_id = cursor.lastrowid
+                print(user_id)
+                loginToken = create_token()
+                print(loginToken)
+                cursor.execute("INSERT INTO user_session(loginToken, user_id) VALUES(?, ?)", [loginToken, user_id])
+                conn.commit()
+                rows = cursor.rowcount
+
+                cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
+                user_row = cursor.fetchone()
+                user = {}
+                headers = [i[0] for i in cursor.description]
+                user = dict(zip(headers, user_row))
+                user["loginToken"] = loginToken
+                user.pop("password")
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -183,20 +191,19 @@ def login():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM users WHERE username=? AND password=?", [user_username, user_password])
             user_row = cursor.fetchone()
-            print(user_row)
-            user = {}
-            headers = [i[0] for i in cursor.description]
-            user = dict(zip(headers, user_row))
             if user_row != None and user_row != []:
+                user = {}
+                headers = [i[0] for i in cursor.description]
+                user = dict(zip(headers, user_row))
                 user_id = user_row[0]
                 print(user_id)
-                token = random.randint(0, 10000000)
-                cursor.execute("INSERT INTO user_session(loginToken, user_id) VALUES(?, ?)", [token, user_id])
+                loginToken = create_token()
+                print(loginToken)
+                cursor.execute("INSERT INTO user_session(loginToken, user_id) VALUES(?, ?)", [loginToken, user_id])
                 conn.commit()
                 rows = cursor.rowcount
-                print(rows)
-                user["loginToken"] = token
-                print(token)
+                user["loginToken"] = loginToken
+                user.pop("password")
                 print(user)      
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
@@ -268,9 +275,13 @@ def tweets():
                 username = user_row[1]
                 print(username)
                 for row in rows:
-                    tweets.append(dict(zip(headers, row)))
-                for tweet in tweets:
+                    tweet = dict(zip(headers, row))
                     tweet["username"] = username
+                    cursor.execute("SELECT COUNT(*) FROM tweet_like WHERE tweet_id=?", [tweet['id']])
+                    like_amount = cursor.fetchone()[0]
+                    print(like_amount)
+                    tweet["like_amount"] = like_amount
+                    tweets.append(tweet)
                 print(tweets)
             else:
                 cursor.execute("SELECT * FROM tweet INNER JOIN users ON tweet.user_id = users.id ORDER BY tweet.created_at DESC")
@@ -410,6 +421,7 @@ def tweets():
         cursor = None
         token = request.json.get("token")
         tweet_id = request.json.get("id")
+        print(tweet_id)
         rows = None
         user = None
         try:
@@ -647,7 +659,7 @@ def comments():
             else:
                 return Response("Delete failed", mimetype="text/html", status=500)
 
-@app.route('/tweet_likes', methods=['GET', 'POST', 'DELETE'])
+@app.route('/tweet-likes', methods=['GET', 'POST', 'DELETE'])
 def tweet_likes():
     if request.method == 'GET':
         conn = None
@@ -659,22 +671,18 @@ def tweet_likes():
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if tweet_id != None and tweet_id != "":
-                cursor.execute("SELECT * FROM tweet_like WHERE tweet_id=?", [tweet_id])
+                cursor.execute("SELECT * FROM tweet_like INNER JOIN users ON tweet_like.user_id = users.id WHERE tweet_id=?", [tweet_id])
                 rows = cursor.fetchall()
                 tweet_likes = []
                 for row in rows:
-                    user_id = row[2]
-                    print(user_id)
-                    cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
-                    user_row = cursor.fetchone()
-                    username = user_row[1]
                     tweet_like = {
-                        "tweet_id": tweet_id,
-                        "user_id": user_id,
-                        "username": username
+                        "tweet_id": row[1],
+                        "user_id": row[2],
+                        "username": row[4]
                     }
                     print(tweet_like)
                     tweet_likes.append(tweet_like)
+
             else:
                 cursor.execute("SELECT * FROM tweet_like INNER JOIN users ON tweet_like.user_id = users.id")
                 rows = cursor.fetchall()
@@ -749,6 +757,7 @@ def tweet_likes():
         cursor = None
         token = request.json.get("token")
         tweet_id = request.json.get("tweet_id")
+        print(tweet_id)
         user = None
         rows = None
         try:
@@ -782,7 +791,7 @@ def tweet_likes():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
-@app.route('/comment_likes', methods=['GET', 'POST', 'DELETE'])
+@app.route('/comment-likes', methods=['GET', 'POST', 'DELETE'])
 def comment_likes():
     if request.method == 'GET':
         conn = None
