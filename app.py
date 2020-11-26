@@ -175,7 +175,39 @@ def users():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
-    # elif request.method == 'DELETE'
+    elif request.method == 'DELETE':
+        conn = None
+        cursor = None
+        rows = None
+        token = request.json.get("token")
+        password = request.json.get("password")
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_session INNER JOIN users ON user_session.user_id = users.id WHERE loginToken=? and password=?", [token, password])
+            row= cursor.fetchone()
+            user_id = row[2]
+            cursor.execute("DELETE FROM users WHERE id=?", [user_id,])
+            conn.commit()
+            rows = cursor.rowcount
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if cursor != None:
+                cursor.close()
+            if conn != None:
+                conn.rollback()
+                conn.close()
+            if rows == 1:
+                return Response("Delete account success!", mimetype="text/html", status=204)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
 
 @app.route('/login', methods=['POST', 'DELETE'])
 def login():
@@ -295,6 +327,10 @@ def tweets():
                         "user_id": rows[i][3],
                         "username": rows[i][5]
                     }
+                    cursor.execute("SELECT COUNT(*) FROM tweet_like WHERE tweet_id=?", [tweet['id']])
+                    like_amount = cursor.fetchone()[0]
+                    print(like_amount)
+                    tweet["like_amount"] = like_amount
                     print(tweet)
                     tweets.append(tweet)
         except mariadb.dataError:
@@ -467,23 +503,29 @@ def comments():
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if tweet_id != None and tweet_id != "":
-                cursor.execute("SELECT * FROM tweet WHERE id=?", [tweet_id])
-                row = cursor.fetchone()
-                user_id = row[3]
-                print(user_id)
-                cursor.execute("SELECT * FROM comment WHERE user_id=? AND tweet_id=? ORDER BY created_at DESC", [user_id, tweet_id])
+                cursor.execute("SELECT * FROM comment INNER JOIN tweet ON comment.tweet_id = tweet.id WHERE tweet_id=?", [tweet_id])
                 rows = cursor.fetchall()
                 print(rows)
                 comments = []
-                headers = [i[0] for i in cursor.description]
-                cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
-                user_row = cursor.fetchone()
-                username = user_row[1]
-                print(username)
-                for row in rows:
-                    comments.append(dict(zip(headers, row)))
-                for comment in comments:
+                for i in range(len(rows)):
+                    comment={
+                        "id": rows[i][0],
+                        "content": rows[i][1],
+                        "created_at": rows[i][2],
+                        "user_id": rows[i][3],
+                        "tweet_id": rows[i][4]
+                    }
+                    user_id = rows[i][3]
+                    cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
+                    user_row = cursor.fetchone()
+                    username = user_row[1]
                     comment["username"] = username
+                    print(comment)
+                    cursor.execute("SELECT COUNT(*) FROM comment_like WHERE comment_id=?", [comment['id']])
+                    like_amount = cursor.fetchone()[0]
+                    print(like_amount)
+                    comment["like_amount"] = like_amount
+                    comments.append(comment)
                 print(comments)
             else:
                 cursor.execute("SELECT * FROM comment INNER JOIN users ON comment.user_id = users.id")
