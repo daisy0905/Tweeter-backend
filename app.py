@@ -30,9 +30,9 @@ def users():
                 users = []
                 headers = [i[0] for i in cursor.description]
                 for row in rows:
-                    users.append(dict(zip(headers, row)))
-                for user in users:
+                    user = dict(zip(headers, row))
                     user.pop("password")
+                    users.append(user)
                 print(users)
             else:
                 cursor.execute("SELECT * FROM users")
@@ -40,10 +40,10 @@ def users():
                 users = []
                 headers = [i[0] for i in cursor.description]
                 for row in rows:
-                    users.append(dict(zip(headers, row)))
-                for user in users:
+                    user = dict(zip(headers, row))
                     user.pop("password")
-                    print(user)
+                    users.append(user)
+                print(users)
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -153,9 +153,9 @@ def users():
                 rows = cursor.rowcount
                 cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
                 user_row = cursor.fetchone()
-                users = {}
+                user = {}
                 headers = [i[0] for i in cursor.description]
-                users = dict(zip(headers, user_row))
+                user = dict(zip(headers, user_row))
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -171,7 +171,7 @@ def users():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
-                return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+                return Response(json.dumps(user, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
