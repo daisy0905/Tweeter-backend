@@ -631,9 +631,10 @@ def comments():
                 print(user_id)
                 if comment_content != "" and comment_content != None:
                     cursor.execute("UPDATE comment SET content=? WHERE id=? AND user_id=?", [comment_content, comment_id, user_id])
-                conn.commit()
-                rows = cursor.rowcount
-                cursor.execute("SELECT * FROM comment WHERE id=? AND user_id=?", [comment_id, user_id])
+                    conn.commit()
+                    rows = cursor.rowcount
+                print(rows)
+                cursor.execute("SELECT * FROM comment WHERE id=?", [comment_id])
                 comment_row = cursor.fetchone()
                 print(comment_row)
                 comment = {}
@@ -1139,6 +1140,215 @@ def followers():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
             
+@app.route('/nested-comments', methods=['GET', 'POST', 'PATCH', 'DELETE'])
+def nested_comments():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        nested_comments = None
+        comment_id = request.args.get("comment_id")
+        print(comment_id)
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            if comment_id != None and comment_id != "":
+                cursor.execute("SELECT * FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id WHERE comment_id=?", [comment_id])
+                rows = cursor.fetchall()
+                print(rows)
+                nested_comments = []
+                for i in range(len(rows)):
+                    nested_comment={
+                        "id": rows[i][0],
+                        "content": rows[i][1],
+                        "created_at": rows[i][2],
+                        "comment_id": rows[i][3],
+                        "user_id": rows[i][4],
+                        "username": rows[i][11]
+                    }
+                    print(nested_comment)
+                    nested_comments.append(nested_comment)
+                print(nested_comments)
+            else:
+                cursor.execute("SELECT * FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id")
+                rows = cursor.fetchall()
+                nested_comments = []
+                for i in range(len(rows)):
+                    nested_comment={
+                        "id": rows[i][0],
+                        "content": rows[i][1],
+                        "created_at": rows[i][2],
+                        "comment_id": rows[i][3],
+                        "user_id": rows[i][4],
+                        "username": rows[i][11]
+                    }
+                    print(nested_comment)
+                    nested_comments.append(nested_comment)
+                print(nested_comments)
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(nested_comments != None):
+                return Response(json.dumps(nested_comments, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+
+    elif request.method == 'POST':
+        conn = None
+        cursor = None
+        token = request.json.get("token")
+        comment_id = request.json.get("comment_id")
+        nested_comment_content = request.json.get("content")
+        nested_comment = None
+        user = None
+        rows = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+            user = cursor.fetchone()
+            print(user)
+            if user != None and user != []:
+                user_id = user[2]
+                print(user_id)
+                cursor.execute("INSERT INTO nested_comment(content, comment_id, user_id) VALUES(?, ?, ?)", [nested_comment_content, comment_id, user_id])
+                conn.commit()
+                rows = cursor.rowcount
+                print(rows)
+                if rows == 1:
+                    nested_comment_id = cursor.lastrowid
+                    print(nested_comment_id)
+                    cursor.execute("SELECT * FROM nested_comment INNER JOIN users ON nested_comment.user_id = users.id WHERE nested_comment.id=?", [nested_comment_id,])
+                    row = cursor.fetchone()
+                    print(row)
+                    nested_comment = {}
+                    nested_comment = {
+                        "id": row[0],
+                        "content": row[1],
+                        "created_at": row[2],
+                        "comment_id": row[3],
+                        "user_id": row[4],
+                        "username": row[6]
+                    }
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response(json.dumps(nested_comment, default=str), mimetype="application/json", status=201)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+    
+    elif request.method == 'PATCH':
+        conn = None
+        cursor = None
+        token = request.json.get("token")
+        nested_comment_id = request.json.get("id")
+        nested_comment_content = request.json.get("content")
+        nested_comment = None
+        user = None
+        rows = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor() 
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+            user = cursor.fetchone()
+            print(user)
+            if user != None and user != []:
+                user_id = user[2]
+                print(user_id)
+                if nested_comment_content != "" and nested_comment_content != None:
+                    cursor.execute("UPDATE nested_comment SET content=? WHERE id=? AND user_id=?", [nested_comment_content, nested_comment_id, user_id])
+                    conn.commit()
+                    rows = cursor.rowcount
+                print(rows)
+                cursor.execute("SELECT * FROM nested_comment INNER JOIN users ON nested_comment.user_id = users.id WHERE nested_comment.id=?", [nested_comment_id])
+                row = cursor.fetchone()
+                print(row)
+                nested_comment = {}
+                nested_comment = {
+                    "id": row[0],
+                    "content": row[1],
+                    "created_at": row[2],
+                    "comment_id": row[3],
+                    "username": row[6]
+                }
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if cursor != None:
+                cursor.close()
+            if conn != None:
+                conn.rollback()
+                conn.close()
+            if rows == 1:
+                return Response(json.dumps(nested_comment, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Updated failed", mimetype="text/html", status=500)
+    
+    elif request.method == 'DELETE':
+        conn = None
+        cursor = None
+        token = request.json.get("token")
+        nested_comment_id = request.json.get("id")
+        rows = None
+        user = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+            user = cursor.fetchone()
+            print(user)
+            if user != None and user != []:
+                user_id = user[2]
+                print(user_id) 
+                cursor.execute("DELETE FROM nested_comment WHERE id=? AND user_id=?", [nested_comment_id, user_id])
+                conn.commit()
+                rows = cursor.rowcount
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if cursor != None:
+                cursor.close()
+            if conn != None:
+                conn.rollback()
+                conn.close()
+            if rows == 1:
+                return Response("Delete Success", mimetype="text/html", status=204)
+            else:
+                return Response("Delete failed", mimetype="text/html", status=500)
 
     
 
