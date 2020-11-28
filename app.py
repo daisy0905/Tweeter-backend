@@ -359,6 +359,7 @@ def tweets():
         token = request.json.get("token")
         user = None
         rows = None
+        tweet = None
         try:
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
@@ -371,18 +372,19 @@ def tweets():
                 cursor.execute("INSERT INTO tweet(content, user_id) VALUES(?, ?)", [tweet_content, user_id])
                 conn.commit()
                 rows = cursor.rowcount
-                cursor.execute("SELECT * FROM tweet WHERE content=? AND user_id=?", [tweet_content, user_id])
-                tweet_row = cursor.fetchone()
-                print(tweet_row)
-                tweet = {}
-                headers = [i[0] for i in cursor.description]
-                tweet = dict(zip(headers, tweet_row))
-                print(tweet)
-                cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
-                user_row = cursor.fetchone()
-                username = user_row[1]
-                print(username)
-                tweet["username"] = username
+                if rows == 1:
+                    tweet_id = cursor.lastrowid
+                    print(tweet_id)
+                    cursor.execute("SELECT * FROM tweet INNER JOIN users ON tweet.user_id = users.id WHERE tweet.id=?", [tweet_id])
+                    row = cursor.fetchone()
+                    print(row)
+                    tweet = {
+                        "id": row[0],
+                        "content": row[1],
+                        "created_at": row[2],
+                        "user_id": row[3],
+                        "username": row[5]
+                    }
                 print(tweet)
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
@@ -569,6 +571,7 @@ def comments():
         comment_content = request.json.get("content")
         user = None
         rows = None
+        comment = None
         try:
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
@@ -581,17 +584,20 @@ def comments():
                 cursor.execute("INSERT INTO comment(content, user_id, tweet_id) VALUES(?, ?, ?)", [comment_content, user_id, tweet_id])
                 conn.commit()
                 rows = cursor.rowcount
-                cursor.execute("SELECT * FROM comment WHERE content=? AND user_id=? AND tweet_id=?", [comment_content, user_id, tweet_id])
-                comment_row = cursor.fetchone()
-                print(comment_row)
-                comment = {}
-                headers = [i[0] for i in cursor.description]
-                comment = dict(zip(headers, comment_row))
-                cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
-                user_row = cursor.fetchone()
-                username = user_row[1]
-                print(username)
-                comment["username"] = username
+                if rows == 1:
+                    comment_id = cursor.lastrowid
+                    print(comment_id)
+                    cursor.execute("SELECT * FROM comment INNER JOIN users ON comment.user_id = users.id WHERE comment.id=?", [comment_id])
+                    row = cursor.fetchone()
+                    print(row)
+                    comment = {
+                        "id": row[0],
+                        "content": row[1],
+                        "created_at": row[2],
+                        "user_id": row[3],
+                        "tweet_id": row[4],
+                        "username": row[6]
+                    }
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -1329,6 +1335,131 @@ def nested_comments():
                 user_id = user[2]
                 print(user_id) 
                 cursor.execute("DELETE FROM nested_comment WHERE id=? AND user_id=?", [nested_comment_id, user_id])
+                conn.commit()
+                rows = cursor.rowcount
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if cursor != None:
+                cursor.close()
+            if conn != None:
+                conn.rollback()
+                conn.close()
+            if rows == 1:
+                return Response("Delete Success", mimetype="text/html", status=204)
+            else:
+                return Response("Delete failed", mimetype="text/html", status=500)
+
+@app.route('/retweets', methods=['GET', 'POST', 'DELETE'])
+def retweets():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        retweets = None
+        user_id = request.args.get("user_id")
+        print(user_id)
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            if user_id != None and user_id != "":
+                cursor.execute("SELECT retweet.id, retweet.tweet_id, tweet.content, tweet.created_at, tweet.user_id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id WHERE retweet.user_id=?", [user_id])
+                rows = cursor.fetchall()
+                retweets = []
+                headers = [i[0] for i in cursor.description]
+                for row in rows:
+                    retweet = dict(zip(headers, row))
+                    retweets.append(retweet)
+                print(retweets)
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(retweets != None):
+                return Response(json.dumps(retweets, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+    
+    elif request.method == 'POST':
+        conn = None
+        cursor = None
+        tweet_id = request.json.get("tweet_id")
+        token = request.json.get("token")
+        user = None
+        rows = None
+        retweet = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+            user = cursor.fetchone()
+            print(user)
+            if user != None and user != []:
+                user_id = user[2]
+                print(user_id)
+                cursor.execute("INSERT INTO retweet(tweet_id, user_id) VALUES(?, ?)", [tweet_id, user_id])
+                conn.commit()
+                rows = cursor.rowcount
+                print(rows)
+                cursor.execute("SELECT retweet.id, retweet.tweet_id, tweet.content, tweet.created_at, tweet.user_id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id WHERE retweet.tweet_id=? AND retweet.user_id=?", [tweet_id, user_id])
+                row = cursor.fetchone()
+                print(row)
+                retweets = {}
+                headers = [i[0] for i in cursor.description]
+                retweet = dict(zip(headers, row))
+                print(retweet)
+        except mariadb.dataError:
+            print("There seems to be something wrong with your data.")
+        except mariadb.databaseError:
+            print("There seems to be something wrong with your database.")
+        except mariadb.ProgrammingError:
+            print("There seems to be something wrong with SQL written.")
+        except mariadb.OperationalError:
+            print("There seems to be something wrong with the connection.")
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response(json.dumps(retweet, default=str), mimetype="application/json", status=201)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+       
+    elif request.method == 'DELETE':
+        conn = None
+        cursor = None
+        token = request.json.get("token")
+        tweet_id = request.json.get("tweet_id")
+        print(tweet_id)
+        rows = None
+        user = None
+        try:
+            conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
+            user = cursor.fetchone()
+            print(user)
+            if user != None and user != []:
+                user_id = user[2]
+                print(user_id) 
+                cursor.execute("DELETE FROM retweet WHERE tweet_id=? AND user_id=?", [tweet_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
         except mariadb.dataError:
