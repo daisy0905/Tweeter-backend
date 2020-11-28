@@ -503,7 +503,7 @@ def comments():
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if tweet_id != None and tweet_id != "":
-                cursor.execute("SELECT * FROM comment INNER JOIN tweet ON comment.tweet_id = tweet.id WHERE tweet_id=?", [tweet_id])
+                cursor.execute("SELECT * FROM comment INNER JOIN tweet ON comment.tweet_id = tweet.id WHERE tweet_id=? ORDER BY comment.created_at DESC", [tweet_id])
                 rows = cursor.fetchall()
                 print(rows)
                 comments = []
@@ -528,7 +528,7 @@ def comments():
                     comments.append(comment)
                 print(comments)
             else:
-                cursor.execute("SELECT * FROM comment INNER JOIN users ON comment.user_id = users.id")
+                cursor.execute("SELECT * FROM comment INNER JOIN users ON comment.user_id = users.id ORDER BY comment.created_at DESC")
                 rows = cursor.fetchall()
                 comments = []
                 for i in range(len(rows)):
@@ -1152,7 +1152,7 @@ def nested_comments():
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if comment_id != None and comment_id != "":
-                cursor.execute("SELECT * FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id WHERE comment_id=?", [comment_id])
+                cursor.execute("SELECT * FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id WHERE comment_id=? ORDER BY nested_comment.created_at DESC", [comment_id])
                 rows = cursor.fetchall()
                 print(rows)
                 nested_comments = []
@@ -1169,7 +1169,7 @@ def nested_comments():
                     nested_comments.append(nested_comment)
                 print(nested_comments)
             else:
-                cursor.execute("SELECT * FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id")
+                cursor.execute("SELECT * FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id ORDER BY nested_comment.created_at DESC")
                 rows = cursor.fetchall()
                 nested_comments = []
                 for i in range(len(rows)):
