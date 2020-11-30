@@ -19,7 +19,7 @@ def users():
         conn = None
         cursor = None
         user_id = request.args.get("id")
-        print(user_id)
+        # print(user_id)
         users = None
         try:
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
@@ -33,7 +33,7 @@ def users():
                     user = dict(zip(headers, row))
                     user.pop("password")
                     users.append(user)
-                print(users)
+                # print(users)
             else:
                 cursor.execute("SELECT * FROM users")
                 rows = cursor.fetchall()
@@ -43,7 +43,7 @@ def users():
                     user = dict(zip(headers, row))
                     user.pop("password")
                     users.append(user)
-                print(users)
+                # print(users)
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -80,12 +80,12 @@ def users():
             cursor.execute("INSERT INTO users(username, password, birthdate, bio, email, image) VALUES(?, ?, ?, ?, ?, ?)", [user_username, user_password, user_birthdate, user_bio, user_email, user_image])
             conn.commit()
             rows = cursor.rowcount
-            print(rows)
+            # print(rows)
             if rows == 1:
                 user_id = cursor.lastrowid
                 print(user_id)
                 loginToken = create_token()
-                print(loginToken)
+                # print(loginToken)
                 cursor.execute("INSERT INTO user_session(loginToken, user_id) VALUES(?, ?)", [loginToken, user_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -133,10 +133,10 @@ def users():
             cursor = conn.cursor() 
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 if user_username != "" and user_username != None:
                     cursor.execute("UPDATE users SET username=? WHERE id=?", [user_username, user_id])
                 if user_password != "" and user_password != None:
