@@ -1368,12 +1368,35 @@ def retweets():
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if user_id != None and user_id != "":
-                cursor.execute("SELECT retweet.id, retweet.tweet_id, tweet.content, tweet.created_at, tweet.user_id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id WHERE retweet.user_id=?", [user_id])
+                cursor.execute("SELECT retweet.id, retweet.tweet_id, retweet.user_id, tweet.content, tweet.created_at, users.id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id WHERE retweet.user_id=?", [user_id])
                 rows = cursor.fetchall()
                 retweets = []
                 headers = [i[0] for i in cursor.description]
                 for row in rows:
                     retweet = dict(zip(headers, row))
+                    cursor.execute("SELECT username FROM users WHERE id=?", [user_id,])
+                    user_row = cursor.fetchone()
+                    name = user_row[0]
+                    retweet["name"] = name
+                    cursor.execute("SELECT COUNT(*) FROM retweet WHERE tweet_id=?", [retweet['tweet_id']])
+                    retweet_amount = cursor.fetchone()[0]
+                    retweet["retweet_amount"] = retweet_amount
+                    retweets.append(retweet)
+                print(retweets)
+            else:
+                cursor.execute("SELECT retweet.id, retweet.tweet_id, retweet.user_id, tweet.content, tweet.created_at, users.id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id")
+                rows = cursor.fetchall()
+                retweets = []
+                headers = [i[0] for i in cursor.description]
+                for row in rows:
+                    retweet = dict(zip(headers, row))
+                    cursor.execute("SELECT username FROM users WHERE id=?", [retweet['user_id']])
+                    user_row = cursor.fetchone()
+                    name = user_row[0]
+                    retweet["name"] = name
+                    cursor.execute("SELECT COUNT(*) FROM retweet WHERE tweet_id=?", [retweet['tweet_id']])
+                    retweet_amount = cursor.fetchone()[0]
+                    retweet["retweet_amount"] = retweet_amount
                     retweets.append(retweet)
                 print(retweets)
         except mariadb.dataError:
