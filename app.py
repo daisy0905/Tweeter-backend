@@ -43,7 +43,7 @@ def users():
                     user = dict(zip(headers, row))
                     user.pop("password")
                     users.append(user)
-                # print(users)
+                print(users)
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -209,6 +209,8 @@ def users():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
+#################### Users ######################## Users ############################# Users #################
+
 @app.route('/login', methods=['POST', 'DELETE'])
 def login():
     if request.method == 'POST':
@@ -228,9 +230,9 @@ def login():
                 headers = [i[0] for i in cursor.description]
                 user = dict(zip(headers, user_row))
                 user_id = user_row[0]
-                print(user_id)
+                # print(user_id)
                 loginToken = create_token()
-                print(loginToken)
+                # print(loginToken)
                 cursor.execute("INSERT INTO user_session(loginToken, user_id) VALUES(?, ?)", [loginToken, user_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -286,53 +288,59 @@ def login():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
+#################### Login ######################## Login ############################# Login #################
+
 @app.route('/tweets', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def tweets():
     if request.method == 'GET':
         conn = None
         cursor = None
         tweets = None
+        content = request.args.get("content")
         user_id = request.args.get("id")
         print(user_id)
         try:
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if user_id != None and user_id != "":
-                cursor.execute("SELECT * FROM tweet WHERE user_id=? ORDER BY created_at DESC", [user_id])
+                cursor.execute("SELECT tweet.id, tweet.content, tweet.image, tweet.created_at, tweet.user_id, users.username FROM tweet INNER JOIN users ON tweet.user_id = users.id WHERE user_id=? ORDER BY tweet.created_at DESC", [user_id,])
                 rows = cursor.fetchall()
                 tweets = []
                 headers = [i[0] for i in cursor.description]
-                cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
-                user_row = cursor.fetchone()
-                username = user_row[1]
-                print(username)
                 for row in rows:
                     tweet = dict(zip(headers, row))
-                    tweet["username"] = username
                     cursor.execute("SELECT COUNT(*) FROM tweet_like WHERE tweet_id=?", [tweet['id']])
                     like_amount = cursor.fetchone()[0]
                     print(like_amount)
                     tweet["like_amount"] = like_amount
                     tweets.append(tweet)
                 print(tweets)
-            else:
-                cursor.execute("SELECT * FROM tweet INNER JOIN users ON tweet.user_id = users.id ORDER BY tweet.created_at DESC")
+            elif content != None and content != "":
+                cursor.execute("SELECT tweet.id, tweet.content, tweet.image, tweet.created_at, tweet.user_id, users.username FROM tweet INNER JOIN users ON tweet.user_id = users.id WHERE username LIKE ? OR email LIKE ? OR content LIKE ? ORDER BY tweet.created_at DESC", [user_id, "%{}%".format(content), "%{}%".format(content), "%{}%".format(content)])
                 rows = cursor.fetchall()
                 tweets = []
-                for i in range(len(rows)):
-                    tweet={
-                        "id": rows[i][0],
-                        "content": rows[i][1],
-                        "created_at": rows[i][2],
-                        "user_id": rows[i][3],
-                        "username": rows[i][5]
-                    }
+                headers = [i[0] for i in cursor.description]
+                for row in rows:
+                    tweet = dict(zip(headers, row))
                     cursor.execute("SELECT COUNT(*) FROM tweet_like WHERE tweet_id=?", [tweet['id']])
                     like_amount = cursor.fetchone()[0]
                     print(like_amount)
                     tweet["like_amount"] = like_amount
-                    print(tweet)
                     tweets.append(tweet)
+                # print(tweets)
+            elif user_id == None or user_id == "" and content == None or content == "":
+                cursor.execute("SELECT tweet.id, tweet.content, tweet.image, tweet.created_at, tweet.user_id, users.username FROM tweet INNER JOIN users ON tweet.user_id = users.id ORDER BY tweet.created_at DESC")
+                rows = cursor.fetchall()
+                tweets = []
+                headers = [i[0] for i in cursor.description]
+                for row in rows:
+                    tweet = dict(zip(headers, row))
+                    cursor.execute("SELECT COUNT(*) FROM tweet_like WHERE tweet_id=?", [tweet['id']])
+                    like_amount = cursor.fetchone()[0]
+                    print(like_amount)
+                    tweet["like_amount"] = like_amount
+                    tweets.append(tweet)
+                # print(tweets)
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -356,6 +364,7 @@ def tweets():
         conn = None
         cursor = None
         tweet_content = request.json.get("content")
+        tweet_image = request.json.get("image")
         token = request.json.get("token")
         user = None
         rows = None
@@ -369,7 +378,7 @@ def tweets():
             if user != None and user != []:
                 user_id = user[2]
                 print(user_id)
-                cursor.execute("INSERT INTO tweet(content, user_id) VALUES(?, ?)", [tweet_content, user_id])
+                cursor.execute("INSERT INTO tweet(content, image, user_id) VALUES(?, ?, ?)", [tweet_content, tweet_image, user_id])
                 conn.commit()
                 rows = cursor.rowcount
                 if rows == 1:
@@ -381,9 +390,10 @@ def tweets():
                     tweet = {
                         "id": row[0],
                         "content": row[1],
+                        "image": row[4],
                         "created_at": row[2],
                         "user_id": row[3],
-                        "username": row[5]
+                        "username": row[6]
                     }
                 print(tweet)
         except mariadb.dataError:
@@ -410,6 +420,7 @@ def tweets():
         cursor = None
         token = request.json.get("token")
         tweet_content = request.json.get("content")
+        tweet_image = request.json.get("image")
         tweet_id = request.json.get("id")
         user = None
         rows = None
@@ -425,14 +436,18 @@ def tweets():
                 print(user_id)
                 if tweet_content != "" and tweet_content != None:
                     cursor.execute("UPDATE tweet SET content=? WHERE id=? AND user_id=?", [tweet_content, tweet_id, user_id])
+                if tweet_image != "" and tweet_image != None:
+                    cursor.execute("UPDATE tweet SET image=? WHERE id=? AND user_id=?", [tweet_image, tweet_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
+                print(rows)
                 cursor.execute("SELECT * FROM tweet WHERE id=? AND user_id=?", [tweet_id, user_id])
                 tweet_row = cursor.fetchone()
                 print(tweet_row)
                 tweet={
                     "id": tweet_row[0],
-                    "content": tweet_row[1]
+                    "content": tweet_row[1],
+                    "image": tweet_row[4]
                 }
                 print(tweet)
         except mariadb.dataError:
@@ -467,10 +482,10 @@ def tweets():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id) 
+                # print(user_id) 
                 cursor.execute("DELETE FROM tweet WHERE id=? AND user_id=?", [tweet_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -493,6 +508,8 @@ def tweets():
             else:
                 return Response("Delete failed", mimetype="text/html", status=500)
 
+#################### Tweets ######################## Tweets ############################# Tweets #################
+
 @app.route('/comments', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def comments():
     if request.method == 'GET':
@@ -500,14 +517,14 @@ def comments():
         cursor = None
         comments = None
         tweet_id = request.args.get("tweet_id")
-        print(tweet_id)
+        # print(tweet_id)
         try:
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if tweet_id != None and tweet_id != "":
                 cursor.execute("SELECT * FROM comment INNER JOIN tweet ON comment.tweet_id = tweet.id WHERE tweet_id=? ORDER BY comment.created_at DESC", [tweet_id])
                 rows = cursor.fetchall()
-                print(rows)
+                # print(rows)
                 comments = []
                 for i in range(len(rows)):
                     comment={
@@ -522,10 +539,10 @@ def comments():
                     user_row = cursor.fetchone()
                     username = user_row[1]
                     comment["username"] = username
-                    print(comment)
+                    # print(comment)
                     cursor.execute("SELECT COUNT(*) FROM comment_like WHERE comment_id=?", [comment['id']])
                     like_amount = cursor.fetchone()[0]
-                    print(like_amount)
+                    # print(like_amount)
                     comment["like_amount"] = like_amount
                     comments.append(comment)
                 print(comments)
@@ -577,19 +594,19 @@ def comments():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 cursor.execute("INSERT INTO comment(content, user_id, tweet_id) VALUES(?, ?, ?)", [comment_content, user_id, tweet_id])
                 conn.commit()
                 rows = cursor.rowcount
                 if rows == 1:
                     comment_id = cursor.lastrowid
-                    print(comment_id)
+                    # print(comment_id)
                     cursor.execute("SELECT * FROM comment INNER JOIN users ON comment.user_id = users.id WHERE comment.id=?", [comment_id])
                     row = cursor.fetchone()
-                    print(row)
+                    # print(row)
                     comment = {
                         "id": row[0],
                         "content": row[1],
@@ -631,26 +648,21 @@ def comments():
             cursor = conn.cursor() 
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 if comment_content != "" and comment_content != None:
                     cursor.execute("UPDATE comment SET content=? WHERE id=? AND user_id=?", [comment_content, comment_id, user_id])
                     conn.commit()
                     rows = cursor.rowcount
-                print(rows)
-                cursor.execute("SELECT * FROM comment WHERE id=?", [comment_id])
+                # print(rows)
+                cursor.execute("SELECT comment.id, comment.content, comment.created_at, comment.user_id, comment.tweet_id, users.username FROM comment INNER JOIN users ON comment.user_id = users.id WHERE comment.id=?", [comment_id])
                 comment_row = cursor.fetchone()
-                print(comment_row)
+                # print(comment_row)
                 comment = {}
                 headers = [i[0] for i in cursor.description]
                 comment = dict(zip(headers, comment_row))
-                cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
-                user_row = cursor.fetchone()
-                username = user_row[1]
-                print(username)
-                comment["username"] = username
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -708,6 +720,8 @@ def comments():
             else:
                 return Response("Delete failed", mimetype="text/html", status=500)
 
+#################### Comments ######################## Comments ############################# Comments #################
+
 @app.route('/tweet-likes', methods=['GET', 'POST', 'DELETE'])
 def tweet_likes():
     if request.method == 'GET':
@@ -715,7 +729,7 @@ def tweet_likes():
         cursor = None
         tweet_likes = None
         tweet_id = request.args.get("tweet_id")
-        print(tweet_id)
+        # print(tweet_id)
         try:
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
@@ -731,7 +745,6 @@ def tweet_likes():
                     }
                     print(tweet_like)
                     tweet_likes.append(tweet_like)
-
             else:
                 cursor.execute("SELECT * FROM tweet_like INNER JOIN users ON tweet_like.user_id = users.id")
                 rows = cursor.fetchall()
@@ -775,10 +788,10 @@ def tweet_likes():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 cursor.execute("INSERT INTO tweet_like(tweet_id, user_id) VALUES(?, ?)", [tweet_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -817,7 +830,7 @@ def tweet_likes():
             print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 cursor.execute("DELETE FROM tweet_like WHERE tweet_id=? AND user_id=?", [tweet_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -840,6 +853,8 @@ def tweet_likes():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
+#################### Tweet-likes ######################## Tweet-likes ############################# Tweet-likes #################
+
 @app.route('/comment-likes', methods=['GET', 'POST', 'DELETE'])
 def comment_likes():
     if request.method == 'GET':
@@ -847,7 +862,7 @@ def comment_likes():
         cursor = None
         comment_likes = None
         comment_id = request.args.get("comment_id")
-        print(comment_id)
+        # print(comment_id)
         try:
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
@@ -857,7 +872,7 @@ def comment_likes():
                 comment_likes = []
                 for row in rows:
                     user_id = row[2]
-                    print(user_id)
+                    # print(user_id)
                     cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
                     user_row = cursor.fetchone()
                     username = user_row[1]
@@ -866,7 +881,7 @@ def comment_likes():
                         "user_id": user_id,
                         "username": username
                     }
-                    print(comment_like)
+                    # print(comment_like)
                     comment_likes.append(comment_like)
             else:
                 cursor.execute("SELECT * FROM comment_like INNER JOIN users ON comment_like.user_id = users.id")
@@ -949,10 +964,10 @@ def comment_likes():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 cursor.execute("DELETE FROM comment_like WHERE comment_id=? AND user_id=?", [comment_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -975,13 +990,15 @@ def comment_likes():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
+#################### Comment-likes ######################## Comment-likes ############################# Comment-likes #################
+
 @app.route('/follows', methods=['GET', 'POST', 'DELETE'])
 def follows():
     if request.method == 'GET':
         conn = None
         cursor = None
         user_id = request.args.get("user_id")
-        print(user_id)
+        # print(user_id)
         follows = None
         try:
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
@@ -989,7 +1006,7 @@ def follows():
             if user_id != None and user_id != "":
                 cursor.execute("SELECT * FROM follow INNER JOIN users ON follow.follow_id = users.id WHERE user_id=?", [user_id])
                 rows = cursor.fetchall()
-                print(rows)
+                # print(rows)
                 follows = []
                 for i in range(len(rows)):
                     follow={
@@ -1034,10 +1051,10 @@ def follows():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 cursor.execute("INSERT INTO follow(user_id, follow_id) VALUES(?, ?)", [user_id, follow_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -1072,10 +1089,10 @@ def follows():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 cursor.execute("DELETE FROM follow WHERE user_id=? AND follow_id=?", [user_id, follow_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -1097,6 +1114,8 @@ def follows():
                 return Response("Deleted success!", mimetype="text/html", status=204)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
+
+#################### Follow ######################## Follow ############################# Follow #################
 
 @app.route('/followers', methods=['GET'])
 def followers():
@@ -1145,7 +1164,9 @@ def followers():
                 return Response(json.dumps(followers, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
-            
+
+#################### Follower ######################## Follower ############################# Follower #################
+
 @app.route('/nested-comments', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def nested_comments():
     if request.method == 'GET':
@@ -1153,14 +1174,14 @@ def nested_comments():
         cursor = None
         nested_comments = None
         comment_id = request.args.get("comment_id")
-        print(comment_id)
+        # print(comment_id)
         try:
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if comment_id != None and comment_id != "":
                 cursor.execute("SELECT * FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id WHERE comment_id=? ORDER BY nested_comment.created_at DESC", [comment_id])
                 rows = cursor.fetchall()
-                print(rows)
+                # print(rows)
                 nested_comments = []
                 for i in range(len(rows)):
                     nested_comment={
@@ -1171,7 +1192,7 @@ def nested_comments():
                         "user_id": rows[i][4],
                         "username": rows[i][11]
                     }
-                    print(nested_comment)
+                    # print(nested_comment)
                     nested_comments.append(nested_comment)
                 print(nested_comments)
             else:
@@ -1187,7 +1208,7 @@ def nested_comments():
                         "user_id": rows[i][4],
                         "username": rows[i][11]
                     }
-                    print(nested_comment)
+                    # print(nested_comment)
                     nested_comments.append(nested_comment)
                 print(nested_comments)
         except mariadb.dataError:
@@ -1223,20 +1244,20 @@ def nested_comments():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 cursor.execute("INSERT INTO nested_comment(content, comment_id, user_id) VALUES(?, ?, ?)", [nested_comment_content, comment_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
-                print(rows)
+                # print(rows)
                 if rows == 1:
                     nested_comment_id = cursor.lastrowid
                     print(nested_comment_id)
                     cursor.execute("SELECT * FROM nested_comment INNER JOIN users ON nested_comment.user_id = users.id WHERE nested_comment.id=?", [nested_comment_id,])
                     row = cursor.fetchone()
-                    print(row)
+                    # print(row)
                     nested_comment = {}
                     nested_comment = {
                         "id": row[0],
@@ -1279,18 +1300,18 @@ def nested_comments():
             cursor = conn.cursor() 
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 if nested_comment_content != "" and nested_comment_content != None:
                     cursor.execute("UPDATE nested_comment SET content=? WHERE id=? AND user_id=?", [nested_comment_content, nested_comment_id, user_id])
                     conn.commit()
                     rows = cursor.rowcount
-                print(rows)
+                # print(rows)
                 cursor.execute("SELECT * FROM nested_comment INNER JOIN users ON nested_comment.user_id = users.id WHERE nested_comment.id=?", [nested_comment_id])
                 row = cursor.fetchone()
-                print(row)
+                # print(row)
                 nested_comment = {}
                 nested_comment = {
                     "id": row[0],
@@ -1330,10 +1351,10 @@ def nested_comments():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id) 
+                # print(user_id) 
                 cursor.execute("DELETE FROM nested_comment WHERE id=? AND user_id=?", [nested_comment_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -1355,6 +1376,8 @@ def nested_comments():
                 return Response("Delete Success", mimetype="text/html", status=204)
             else:
                 return Response("Delete failed", mimetype="text/html", status=500)
+
+#################### Nested-comments ######################## Nested-comments ############################# Nested-comments #################
 
 @app.route('/retweets', methods=['GET', 'POST', 'DELETE'])
 def retweets():
@@ -1431,17 +1454,17 @@ def retweets():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id)
+                # print(user_id)
                 cursor.execute("INSERT INTO retweet(tweet_id, user_id) VALUES(?, ?)", [tweet_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
-                print(rows)
+                # print(rows)
                 cursor.execute("SELECT retweet.id, retweet.tweet_id, tweet.content, tweet.created_at, tweet.user_id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id WHERE retweet.tweet_id=? AND retweet.user_id=?", [tweet_id, user_id])
                 row = cursor.fetchone()
-                print(row)
+                # print(row)
                 retweets = {}
                 headers = [i[0] for i in cursor.description]
                 retweet = dict(zip(headers, row))
@@ -1470,7 +1493,7 @@ def retweets():
         cursor = None
         token = request.json.get("token")
         tweet_id = request.json.get("tweet_id")
-        print(tweet_id)
+        # print(tweet_id)
         rows = None
         user = None
         try:
@@ -1478,10 +1501,10 @@ def retweets():
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            print(user)
+            # print(user)
             if user != None and user != []:
                 user_id = user[2]
-                print(user_id) 
+                # print(user_id) 
                 cursor.execute("DELETE FROM retweet WHERE tweet_id=? AND user_id=?", [tweet_id, user_id])
                 conn.commit()
                 rows = cursor.rowcount
@@ -1503,6 +1526,8 @@ def retweets():
                 return Response("Delete Success", mimetype="text/html", status=204)
             else:
                 return Response("Delete failed", mimetype="text/html", status=500)
+
+#################### Retweets ######################## Retweets ############################# Retweets #################
 
     
 
