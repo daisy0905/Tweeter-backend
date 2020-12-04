@@ -1379,7 +1379,7 @@ def retweets():
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if user_id != None and user_id != "":
-                cursor.execute("SELECT retweet.id, retweet.tweet_id, retweet.user_id, tweet.content, tweet.created_at, users.id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id WHERE retweet.user_id=?", [user_id])
+                cursor.execute("SELECT retweet.id, retweet.tweet_id, retweet.user_id, tweet.content, tweet.image, tweet.created_at, users.id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id WHERE retweet.user_id=?", [user_id])
                 rows = cursor.fetchall()
                 retweets = []
                 headers = [i[0] for i in cursor.description]
@@ -1395,7 +1395,7 @@ def retweets():
                     retweets.append(retweet)
                 print(retweets)
             else:
-                cursor.execute("SELECT retweet.id, retweet.tweet_id, retweet.user_id, tweet.content, tweet.created_at, users.id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id")
+                cursor.execute("SELECT retweet.id, retweet.tweet_id, retweet.user_id, tweet.content, tweet.image, tweet.created_at, users.id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id")
                 rows = cursor.fetchall()
                 retweets = []
                 headers = [i[0] for i in cursor.description]
@@ -1450,7 +1450,7 @@ def retweets():
                 conn.commit()
                 rows = cursor.rowcount
                 # print(rows)
-                cursor.execute("SELECT retweet.id, retweet.tweet_id, tweet.content, tweet.created_at, tweet.user_id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id WHERE retweet.tweet_id=? AND retweet.user_id=?", [tweet_id, user_id])
+                cursor.execute("SELECT retweet.id, retweet.tweet_id, tweet.content, tweet.image, tweet.created_at, tweet.user_id, users.username FROM retweet INNER JOIN tweet ON retweet.tweet_id = tweet.id INNER JOIN users ON tweet.user_id = users.id WHERE retweet.tweet_id=? AND retweet.user_id=?", [tweet_id, user_id])
                 row = cursor.fetchone()
                 # print(row)
                 retweets = {}
