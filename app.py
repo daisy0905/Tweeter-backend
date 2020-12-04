@@ -13,7 +13,7 @@ def create_token():
     loginToken = ''.join(random.choice(letters) for i in range(30))
     return loginToken
 
-@app.route('/users', methods=['GET', 'POST', 'PATCH', 'DELETE'])
+@app.route('/api/users', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def users():
     if request.method == 'GET':
         conn = None
@@ -211,7 +211,7 @@ def users():
 
 #################### Users ######################## Users ############################# Users #################
 
-@app.route('/login', methods=['POST', 'DELETE'])
+@app.route('/api/login', methods=['POST', 'DELETE'])
 def login():
     if request.method == 'POST':
         conn = None
@@ -292,7 +292,7 @@ def login():
 
 ####Added "search" feature: changed SQL statement using LIKE for GET api requests
 ####Added "Tweet using an uploaded photo" feature: changed SQL statement for GET, POST and PATCH api requests
-@app.route('/tweets', methods=['GET', 'POST', 'PATCH', 'DELETE'])
+@app.route('/api/tweets', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def tweets():
     if request.method == 'GET':
         conn = None
@@ -513,7 +513,7 @@ def tweets():
 #################### Tweets ######################## Tweets ############################# Tweets #################
 
 ####Added "Comment using an uploaded photo" feature: changed SQL statement for GET, POST and PATCH api requests
-@app.route('/comments', methods=['GET', 'POST', 'PATCH', 'DELETE'])
+@app.route('/api/comments', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def comments():
     if request.method == 'GET':
         conn = None
@@ -710,7 +710,7 @@ def comments():
 
 #################### Comments ######################## Comments ############################# Comments #################
 
-@app.route('/tweet-likes', methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/tweet-likes', methods=['GET', 'POST', 'DELETE'])
 def tweet_likes():
     if request.method == 'GET':
         conn = None
@@ -843,7 +843,7 @@ def tweet_likes():
 
 #################### Tweet-likes ######################## Tweet-likes ############################# Tweet-likes #################
 
-@app.route('/comment-likes', methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/comment-likes', methods=['GET', 'POST', 'DELETE'])
 def comment_likes():
     if request.method == 'GET':
         conn = None
@@ -980,7 +980,7 @@ def comment_likes():
 
 #################### Comment-likes ######################## Comment-likes ############################# Comment-likes #################
 
-@app.route('/follows', methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/follows', methods=['GET', 'POST', 'DELETE'])
 def follows():
     if request.method == 'GET':
         conn = None
@@ -1105,7 +1105,7 @@ def follows():
 
 #################### Follow ######################## Follow ############################# Follow #################
 
-@app.route('/followers', methods=['GET'])
+@app.route('/api/followers', methods=['GET'])
 def followers():
     if request.method == 'GET':
         conn = None
@@ -1155,7 +1155,7 @@ def followers():
 
 #################### Follower ######################## Follower ############################# Follower #################
 
-@app.route('/nested-comments', methods=['GET', 'POST', 'PATCH', 'DELETE'])
+@app.route('/api/nested-comments', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def nested_comments():
     if request.method == 'GET':
         conn = None
@@ -1367,7 +1367,7 @@ def nested_comments():
 
 #################### Nested-comments ######################## Nested-comments ############################# Nested-comments #################
 
-@app.route('/retweets', methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/retweets', methods=['GET', 'POST', 'DELETE'])
 def retweets():
     if request.method == 'GET':
         conn = None
