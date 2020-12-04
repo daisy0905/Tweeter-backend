@@ -1178,7 +1178,7 @@ def nested_comments():
                         "created_at": rows[i][2],
                         "comment_id": rows[i][3],
                         "user_id": rows[i][4],
-                        "username": rows[i][11]
+                        "username": rows[i][12]
                     }
                     # print(nested_comment)
                     nested_comments.append(nested_comment)
@@ -1194,7 +1194,7 @@ def nested_comments():
                         "created_at": rows[i][2],
                         "comment_id": rows[i][3],
                         "user_id": rows[i][4],
-                        "username": rows[i][11]
+                        "username": rows[i][12]
                     }
                     # print(nested_comment)
                     nested_comments.append(nested_comment)
