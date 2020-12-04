@@ -290,6 +290,8 @@ def login():
 
 #################### Login ######################## Login ############################# Login #################
 
+####Added "search" feature: changed SQL statement using LIKE for GET api requests
+####Added "Tweet using an uploaded photo" feature: changed SQL statement for GET, POST and PATCH api requests
 @app.route('/tweets', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def tweets():
     if request.method == 'GET':
@@ -510,6 +512,7 @@ def tweets():
 
 #################### Tweets ######################## Tweets ############################# Tweets #################
 
+####Added "Comment using an uploaded photo" feature: changed SQL statement for GET, POST and PATCH api requests
 @app.route('/comments', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def comments():
     if request.method == 'GET':
@@ -522,43 +525,28 @@ def comments():
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if tweet_id != None and tweet_id != "":
-                cursor.execute("SELECT * FROM comment INNER JOIN tweet ON comment.tweet_id = tweet.id WHERE tweet_id=? ORDER BY comment.created_at DESC", [tweet_id])
+                cursor.execute("SELECT comment.id, comment.content, comment.image, comment.created_at, comment.user_id, comment.tweet_id, users.username FROM comment INNER JOIN tweet ON comment.tweet_id = tweet.id INNER JOIN users ON comment.user_id = users.id WHERE tweet_id=? ORDER BY comment.created_at DESC", [tweet_id])
                 rows = cursor.fetchall()
                 # print(rows)
                 comments = []
-                for i in range(len(rows)):
-                    comment={
-                        "id": rows[i][0],
-                        "content": rows[i][1],
-                        "created_at": rows[i][2],
-                        "user_id": rows[i][3],
-                        "tweet_id": rows[i][4]
-                    }
-                    user_id = rows[i][3]
-                    cursor.execute("SELECT * FROM users WHERE id=?", [user_id])
-                    user_row = cursor.fetchone()
-                    username = user_row[1]
-                    comment["username"] = username
+                headers = [i[0] for i in cursor.description]
+                for row in rows:
+                    comment = dict(zip(headers, row))
+                    print(comment)
                     # print(comment)
                     cursor.execute("SELECT COUNT(*) FROM comment_like WHERE comment_id=?", [comment['id']])
                     like_amount = cursor.fetchone()[0]
                     # print(like_amount)
                     comment["like_amount"] = like_amount
                     comments.append(comment)
-                print(comments)
+                    print(comments)
             else:
-                cursor.execute("SELECT * FROM comment INNER JOIN users ON comment.user_id = users.id ORDER BY comment.created_at DESC")
+                cursor.execute("SELECT comment.id, comment.content, comment.image, comment.created_at, comment.user_id, comment.tweet_id, users.username FROM comment INNER JOIN users ON comment.user_id = users.id ORDER BY comment.created_at DESC")
                 rows = cursor.fetchall()
                 comments = []
-                for i in range(len(rows)):
-                    comment={
-                        "id": rows[i][0],
-                        "content": rows[i][1],
-                        "created_at": rows[i][2],
-                        "user_id": rows[i][3],
-                        "tweet_id": rows[i][4],
-                        "username": rows[i][6]
-                    }
+                headers = [i[0] for i in cursor.description]
+                for row in rows:
+                    comment = dict(zip(headers, row))
                     print(comment)
                     comments.append(comment)
         except mariadb.dataError:
@@ -586,6 +574,7 @@ def comments():
         token = request.json.get("token")
         tweet_id = request.json.get("tweet_id")
         comment_content = request.json.get("content")
+        comment_image = request.json.get("image")
         user = None
         rows = None
         comment = None
@@ -598,23 +587,18 @@ def comments():
             if user != None and user != []:
                 user_id = user[2]
                 # print(user_id)
-                cursor.execute("INSERT INTO comment(content, user_id, tweet_id) VALUES(?, ?, ?)", [comment_content, user_id, tweet_id])
+                cursor.execute("INSERT INTO comment(content, image, user_id, tweet_id) VALUES(?, ?, ?, ?)", [comment_content, comment_image, user_id, tweet_id])
                 conn.commit()
                 rows = cursor.rowcount
                 if rows == 1:
                     comment_id = cursor.lastrowid
-                    # print(comment_id)
-                    cursor.execute("SELECT * FROM comment INNER JOIN users ON comment.user_id = users.id WHERE comment.id=?", [comment_id])
+                    print(comment_id)
+                    cursor.execute("SELECT comment.id, comment.content, comment.image, comment.created_at, comment.user_id, comment.tweet_id, users.username FROM comment INNER JOIN users ON comment.user_id = users.id WHERE comment.id=?", [comment_id])
                     row = cursor.fetchone()
-                    # print(row)
-                    comment = {
-                        "id": row[0],
-                        "content": row[1],
-                        "created_at": row[2],
-                        "user_id": row[3],
-                        "tweet_id": row[4],
-                        "username": row[6]
-                    }
+                    print(row)
+                    comment = {}
+                    headers = [i[0] for i in cursor.description]
+                    comment = dict(zip(headers, row))
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
@@ -639,6 +623,7 @@ def comments():
         cursor = None
         token = request.json.get("token")
         comment_content = request.json.get("content")
+        comment_image = request.json.get("image")
         comment_id = request.json.get("id")
         user = None
         rows = None
@@ -648,21 +633,24 @@ def comments():
             cursor = conn.cursor() 
             cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [token,])
             user = cursor.fetchone()
-            # print(user)
+            print(user)
             if user != None and user != []:
                 user_id = user[2]
-                # print(user_id)
+                print(user_id)
                 if comment_content != "" and comment_content != None:
                     cursor.execute("UPDATE comment SET content=? WHERE id=? AND user_id=?", [comment_content, comment_id, user_id])
-                    conn.commit()
-                    rows = cursor.rowcount
-                # print(rows)
-                cursor.execute("SELECT comment.id, comment.content, comment.created_at, comment.user_id, comment.tweet_id, users.username FROM comment INNER JOIN users ON comment.user_id = users.id WHERE comment.id=?", [comment_id])
+                if comment_image != "" and comment_image != None:
+                    cursor.execute("UPDATE comment SET image=? WHERE id=? AND user_id=?", [comment_image, comment_id, user_id])
+                conn.commit()
+                rows = cursor.rowcount
+                print(rows)
+                cursor.execute("SELECT comment.id, comment.content, comment.image, comment.created_at, comment.user_id, comment.tweet_id, users.username FROM comment INNER JOIN users ON comment.user_id = users.id WHERE comment.id=?", [comment_id])
                 comment_row = cursor.fetchone()
-                # print(comment_row)
+                print(comment_row)
                 comment = {}
                 headers = [i[0] for i in cursor.description]
                 comment = dict(zip(headers, comment_row))
+                print(comment)
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
