@@ -1231,7 +1231,7 @@ def nested_comments():
                 if rows == 1:
                     nested_comment_id = cursor.lastrowid
                     print(nested_comment_id)
-                    cursor.execute("SELECT * FROM nested_comment INNER JOIN users ON nested_comment.user_id = users.id WHERE nested_comment.id=?", [nested_comment_id,])
+                    cursor.execute("SELECT nested_comment.id, nested_comment.content, nested_comment.created_at, nested_comment.comment_id, nested_comment.user_id, users.username FROM nested_comment INNER JOIN users ON nested_comment.user_id = users.id WHERE nested_comment.id=?", [nested_comment_id,])
                     row = cursor.fetchone()
                     # print(row)
                     nested_comment = {}
@@ -1241,7 +1241,7 @@ def nested_comments():
                         "created_at": row[2],
                         "comment_id": row[3],
                         "user_id": row[4],
-                        "username": row[6]
+                        "username": row[5]
                     }
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
@@ -1284,19 +1284,19 @@ def nested_comments():
                     cursor.execute("UPDATE nested_comment SET content=? WHERE id=? AND user_id=?", [nested_comment_content, nested_comment_id, user_id])
                     conn.commit()
                     rows = cursor.rowcount
-                # print(rows)
-                cursor.execute("SELECT * FROM nested_comment INNER JOIN users ON nested_comment.user_id = users.id WHERE nested_comment.id=?", [nested_comment_id])
-                row = cursor.fetchone()
-                # print(row)
-                nested_comment = {}
-                nested_comment = {
-                    "id": row[0],
-                    "content": row[1],
-                    "created_at": row[2],
-                    "comment_id": row[3],
-                    "user_id": row[4],
-                    "username": row[6]
-                }
+                    # print(rows)
+                    cursor.execute("SELECT nested_comment.id, nested_comment.content, nested_comment.created_at, nested_comment.comment_id, nested_comment.user_id, users.username FROM nested_comment INNER JOIN users ON nested_comment.user_id = users.id WHERE nested_comment.id=?", [nested_comment_id,])
+                    row = cursor.fetchone()
+                    # print(row)
+                    nested_comment = {}
+                    nested_comment = {
+                        "id": row[0],
+                        "content": row[1],
+                        "created_at": row[2],
+                        "comment_id": row[3],
+                        "user_id": row[4],
+                        "username": row[5]
+                    }
         except mariadb.dataError:
             print("There seems to be something wrong with your data.")
         except mariadb.databaseError:
