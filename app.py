@@ -1167,35 +1167,28 @@ def nested_comments():
             conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, port=dbcreds.port, database=dbcreds.database, host=dbcreds.host)
             cursor = conn.cursor()
             if comment_id != None and comment_id != "":
-                cursor.execute("SELECT * FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id WHERE comment_id=? ORDER BY nested_comment.created_at DESC", [comment_id])
+                cursor.execute("SELECT nested_comment.id, nested_comment.content, nested_comment.created_at, nested_comment.comment_id, nested_comment.user_id FROM nested_comment WHERE comment_id=? ORDER BY nested_comment.created_at DESC", [comment_id])
                 rows = cursor.fetchall()
-                # print(rows)
+                print(rows)
                 nested_comments = []
-                for i in range(len(rows)):
-                    nested_comment={
-                        "id": rows[i][0],
-                        "content": rows[i][1],
-                        "created_at": rows[i][2],
-                        "comment_id": rows[i][3],
-                        "user_id": rows[i][4],
-                        "username": rows[i][12]
-                    }
-                    # print(nested_comment)
+                headers = [i[0] for i in cursor.description]
+                for row in rows:
+                    nested_comment = dict(zip(headers, row))
+                    print(nested_comment)
+                    cursor.execute("SELECT * FROM users WHERE id=?", [nested_comment['user_id']])
+                    user_row = cursor.fetchone()
+                    username = user_row[1]
+                    print(username)
+                    nested_comment["username"] = username
                     nested_comments.append(nested_comment)
                 print(nested_comments)
             else:
-                cursor.execute("SELECT * FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id ORDER BY nested_comment.created_at DESC")
+                cursor.execute("SELECT nested_comment.id, nested_comment.content, nested_comment.created_at, nested_comment.comment_id, nested_comment.user_id, users.username FROM nested_comment INNER JOIN comment ON nested_comment.comment_id = comment.id INNER JOIN users ON nested_comment.user_id = users.id ORDER BY nested_comment.created_at DESC")
                 rows = cursor.fetchall()
                 nested_comments = []
-                for i in range(len(rows)):
-                    nested_comment={
-                        "id": rows[i][0],
-                        "content": rows[i][1],
-                        "created_at": rows[i][2],
-                        "comment_id": rows[i][3],
-                        "user_id": rows[i][4],
-                        "username": rows[i][12]
-                    }
+                headers = [i[0] for i in cursor.description]
+                for row in rows:
+                    nested_comment = dict(zip(headers, row))
                     # print(nested_comment)
                     nested_comments.append(nested_comment)
                 print(nested_comments)
@@ -1306,6 +1299,7 @@ def nested_comments():
                     "content": row[1],
                     "created_at": row[2],
                     "comment_id": row[3],
+                    "user_id": row[4],
                     "username": row[6]
                 }
         except mariadb.dataError:
